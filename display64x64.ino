@@ -45,6 +45,8 @@ Value *myEchoStringValueTA1Header;
 Value *myEchoStringValueTA2;
 Value *myEchoStringValueTA3;
 Value *myEchoStringValueTA4Footer;
+Value *myEchoStringValueShape;
+Value *brightnessValue;
 
 DeviceDescription_t myDeviceDescription = {
     .name = "Display",
@@ -70,6 +72,8 @@ String myString = "";
 //Defining canvases for the screen area.
 //canvas64x16 has room for a maximum of 20 characters in two rows up to 10 characters each. 
 GFXcanvas1 canvas64x16(64,16); 
+GFXcanvas1 shape(32,16);
+//GFXcanvas1 cShape(x,y);
 
 
 void displayText(String text, int yPos) {
@@ -109,7 +113,21 @@ ValueString_t echoStringValueTA4Footer = {  .name = "Text Area 4: Footer",
                                     .permission = READ_WRITE,
                                     .max = 20,
                                     .encoding = ""};
+
+ValueString_t echoStringValueShape = {  .name = "Test Shape",
+                                    .type = "string",
+                                    .permission = READ_WRITE,
+                                    .max = 10,
+                                    .encoding = ""};
                                     
+ValueNumber_t intValueBrightness =  {  .name = "Brightness",
+                                    .type = "int",
+                                    .permission = READ_WRITE,
+                                    .min = 0,
+                                    .max = 100,
+                                    .step = 1,
+                                    .unit = "%",
+                                    .si_conversion = ""};
 
 void controlEchoCallback(Value *value, String data, String timestamp)
 {
@@ -128,27 +146,55 @@ void controlEchoCallback(Value *value, String data, String timestamp)
     {
         x = 0;
         y = 0;
+        matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
     }
 
     if(myEchoStringValueTA2 == value)
     {
         x = 0;
         y = 16;
+        matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
     }
 
     if(myEchoStringValueTA3 == value)
     {
         x = 0;
         y = 32;
+        matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
     }
 
     if(myEchoStringValueTA4Footer == value)
     {
         x = 0;
         y = 48;
+        matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
     }
 
-    matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
+    if(myEchoStringValueShape == value)
+    {
+        x = 32;
+        y = 40;
+
+        shape.fillScreen(0x0000); // clearing the canvas 
+        myString = data;
+        Serial.println(myString);
+        value->report(myString);
+        shape.setTextSize(1);
+        shape.setCursor(0,0);
+        shape.println(myString);
+        matrix->drawBitmap(x,y, shape.getBuffer(), shape.width(), shape.height(), 0x001F, 0xFFFF);
+    }
+
+    
+}
+
+void controlBrightnessCallback(Value *value, String data, String timestamp)
+{
+    int userInput = data.toInt();
+    Serial.println(userInput);
+    int brightness = (userInput / 100.0f) * 255;
+    Serial.println(brightness);
+    matrix->setBrightness8(brightness);
 }
 
 void initializeWifi(void)
@@ -194,7 +240,7 @@ void setup()
     mxconfig.clkphase = false;
     matrix = new MatrixPanel_I2S_DMA(mxconfig);
     matrix->begin();
-    matrix->setBrightness8(60);
+    matrix->setBrightness8(255);
     initializeWifi();
     initializeNtp();
 
@@ -230,6 +276,12 @@ void setup()
     myEchoStringValueTA4Footer = myDevice->createStringValue(&echoStringValueTA4Footer);
     myEchoStringValueTA4Footer->onControl(&controlEchoCallback);
 
+    myEchoStringValueShape = myDevice->createStringValue(&echoStringValueShape);
+    myEchoStringValueShape->onControl(&controlEchoCallback);
+
+    brightnessValue = myDevice->createValueNumber(&intValueBrightness);
+    brightnessValue->onControl(&controlBrightnessCallback);
+    
     // Get the last echo string values
     myString = myEchoStringValueTA1Header->getControlData();
     displayText(myString, 0);
