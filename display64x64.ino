@@ -40,13 +40,14 @@ Wappsto wappsto(&client);
 
 Network *myNetwork;
 Device *myDevice;
-Value *myLedValue;
+//Value *myLedValue;
 Value *myEchoStringValueTA1Header;
 Value *myEchoStringValueTA2;
 Value *myEchoStringValueTA3;
 Value *myEchoStringValueTA4Footer;
 Value *myEchoStringValueShape;
 Value *brightnessValue;
+Value *genericCanvas;
 
 DeviceDescription_t myDeviceDescription = {
     .name = "Display",
@@ -63,6 +64,8 @@ unsigned int    p = 0;
 unsigned int    s = 0;
 unsigned int    e = 0;
 //unsigned int tmps = 0;
+int16_t width;
+int16_t height;
 
 //int myLed = 0;
 String myString = "";
@@ -73,7 +76,8 @@ String myString = "";
 //canvas64x16 has room for a maximum of 20 characters in two rows up to 10 characters each. 
 GFXcanvas1 canvas64x16(64,16); 
 GFXcanvas1 shape(32,16);
-//GFXcanvas1 cShape(x,y);
+
+GFXcanvas1 blobShape(64, 64);
 
 
 void displayText(String text, int yPos) {
@@ -129,6 +133,12 @@ ValueNumber_t intValueBrightness =  {  .name = "Brightness",
                                     .unit = "%",
                                     .si_conversion = ""};
 
+ValueBlob_t genericCanvasValue = {  .name = "Generic JSON input",
+                                    .type = "value type",
+                                    .permission = WRITE,
+                                    .max = 512,
+                                    .encoding = ""};
+
 void controlEchoCallback(Value *value, String data, String timestamp)
 {
     int x = NULL;
@@ -141,7 +151,7 @@ void controlEchoCallback(Value *value, String data, String timestamp)
     canvas64x16.setTextSize(1);
     canvas64x16.setCursor(0,0);
     canvas64x16.println(myString);
-
+    
     if(myEchoStringValueTA1Header == value)
     {
         x = 0;
@@ -186,6 +196,49 @@ void controlEchoCallback(Value *value, String data, String timestamp)
     }
 
     
+}
+
+void controlBlobCallback(Value *value, String data, String timestamp)
+{
+    //memset(doc->_readBuffer, 0x00, sizeof(doc->_readBuffer));
+    StaticJsonDocument<512> root;
+    DeserializationError err = deserializeJson(root, data);
+    if(err)
+    {
+        Serial.print("Deserialization failed: ");
+        Serial.println(err.f_str());
+        return;
+    }
+
+    int16_t x = root["textCanvasPosXY"]["x"];
+    int16_t y = root["textCanvasPosXY"]["y"];
+
+    int16_t w = root["textCanvasSizeWH"]["width"];
+    int16_t h = root["textCanvasSizeWH"]["height"];
+
+    GFXcanvas1 canvas(w, h);
+
+    String text = root["textContent"]["string"];
+
+    uint16_t textColor = root["textColor16bit565"]["color"];
+    uint16_t bgColor = root["backgroundColor16bit565"]["color"];
+
+
+    canvas.setCursor(0,0);
+    canvas.println(text);
+
+    Serial.println(x);
+    Serial.println(y);
+    Serial.println(w);
+    Serial.println(h);
+    Serial.println(text);
+    Serial.println(textColor);
+    Serial.println(bgColor);
+    Serial.println(root.memoryUsage());
+
+    matrix->drawBitmap(x,y, canvas.getBuffer(), canvas.width(), canvas.height(), textColor, 0x0000);
+
+    //int memoryUsage = root.memoryUsage();   
 }
 
 void controlBrightnessCallback(Value *value, String data, String timestamp)
@@ -281,6 +334,9 @@ void setup()
 
     brightnessValue = myDevice->createValueNumber(&intValueBrightness);
     brightnessValue->onControl(&controlBrightnessCallback);
+
+    genericCanvas = myDevice->createBlobValue(&genericCanvasValue);
+    genericCanvas->onControl(&controlBlobCallback);
     
     // Get the last echo string values
     myString = myEchoStringValueTA1Header->getControlData();
