@@ -7,8 +7,6 @@
 #include "Wappsto.h"
 #include "wappsto_config.h"
 
-//#include "ntp.ino"
-
 #define R1_PIN  25
 #define G1_PIN  26
 #define B1_PIN  27
@@ -40,11 +38,10 @@ Wappsto wappsto(&client);
 
 Network *myNetwork;
 Device *myDevice;
-//Value *myLedValue;
-Value *myEchoStringValueTA1Header;
-Value *myEchoStringValueTA2;
-Value *myEchoStringValueTA3;
-Value *myEchoStringValueTA4Footer;
+Value *textArea1Header;
+Value *textArea2;
+Value *textArea3;
+Value *textArea4Footer;
 Value *myEchoStringValueShape;
 Value *brightnessValue;
 Value *genericCanvas;
@@ -60,25 +57,17 @@ DeviceDescription_t myDeviceDescription = {
     .communication = "WiFi",
 };
 
-unsigned int    p = 0;
-unsigned int    s = 0;
-unsigned int    e = 0;
-//unsigned int tmps = 0;
-int16_t width;
-int16_t height;
+unsigned int e = 0;
 
-//int myLed = 0;
 String myString = "";
-//String myString2 = ""; // still not sure if i need more than 1 since the first one can be overwritten
-
 
 //Defining canvases for the screen area.
 //canvas64x16 has room for a maximum of 20 characters in two rows up to 10 characters each. 
 GFXcanvas1 canvas64x16(64,16); 
 GFXcanvas1 shape(32,16);
+GFXcanvas1 test(64,8);
 
-GFXcanvas1 blobShape(64, 64);
-
+//GFXcanvas1 blobShape(64, 64);
 
 void displayText(String text, int yPos) {
   int16_t  x1, y1;
@@ -94,31 +83,31 @@ void displayText(String text, int yPos) {
   matrix->print(text);
 }
 
-ValueString_t echoStringValueTA1Header = {  .name = "Text Area 1: Header",
+ValueString_t valueTextArea1Header = {  .name = "Text Area 1: Header",
                                     .type = "string",
                                     .permission = READ_WRITE,
                                     .max = 20,
                                     .encoding = ""};
                                     
-ValueString_t echoStringValueTA2 = {  .name = "Text Area 2",
+ValueString_t valueTextArea2 = {  .name = "Text Area 2",
                                     .type = "string",
                                     .permission = READ_WRITE,
                                     .max = 20,
                                     .encoding = ""};
 
-ValueString_t echoStringValueTA3 = {  .name = "Text Area 3",
+ValueString_t valueTextArea3 = {  .name = "Text Area 3",
                                     .type = "string",
                                     .permission = READ_WRITE,
                                     .max = 20,
                                     .encoding = ""};
 
-ValueString_t echoStringValueTA4Footer = {  .name = "Text Area 4: Footer",
+ValueString_t valueTextArea4Footer = {  .name = "Text Area 4: Footer",
                                     .type = "string",
                                     .permission = READ_WRITE,
                                     .max = 20,
                                     .encoding = ""};
 
-ValueString_t echoStringValueShape = {  .name = "Test Shape",
+ValueString_t valueShape = {  .name = "Test Shape",
                                     .type = "string",
                                     .permission = READ_WRITE,
                                     .max = 10,
@@ -139,63 +128,54 @@ ValueBlob_t genericCanvasValue = {  .name = "Generic JSON input",
                                     .max = 512,
                                     .encoding = ""};
 
-void controlEchoCallback(Value *value, String data, String timestamp)
+void controlTextAreasCallback(Value *value, String data, String timestamp)
 {
-    int x = NULL;
-    int y = NULL;
+    uint16_t x = 0;
+    uint16_t y = 0;
 
     canvas64x16.fillScreen(0x0000); // clearing the canvas 
+    Serial.println(data);
+    value->report(data);
+    canvas64x16.setTextSize(1);
+    canvas64x16.setCursor(0,0);
+    canvas64x16.println(data);
+    
+    if(textArea1Header == value)
+    {
+        y = 0;
+    }
+
+    if(textArea2 == value)
+    {
+        y = 16;
+    }
+
+    if(textArea3 == value)
+    {
+        y = 32;
+    }
+
+    if(textArea4Footer == value)
+    {
+        y = 48;
+    }
+
+    matrix->drawBitmap(x, y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
+}
+
+void controlShapeCallback(Value *value, String data, String timestamp)
+{
+    uint16_t x = 32;
+    uint16_t y = 40;
+
+    shape.fillScreen(0x0000); // clearing the canvas 
     myString = data;
     Serial.println(myString);
     value->report(myString);
-    canvas64x16.setTextSize(1);
-    canvas64x16.setCursor(0,0);
-    canvas64x16.println(myString);
-    
-    if(myEchoStringValueTA1Header == value)
-    {
-        x = 0;
-        y = 0;
-        matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
-    }
-
-    if(myEchoStringValueTA2 == value)
-    {
-        x = 0;
-        y = 16;
-        matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
-    }
-
-    if(myEchoStringValueTA3 == value)
-    {
-        x = 0;
-        y = 32;
-        matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
-    }
-
-    if(myEchoStringValueTA4Footer == value)
-    {
-        x = 0;
-        y = 48;
-        matrix->drawBitmap(x,y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
-    }
-
-    if(myEchoStringValueShape == value)
-    {
-        x = 32;
-        y = 40;
-
-        shape.fillScreen(0x0000); // clearing the canvas 
-        myString = data;
-        Serial.println(myString);
-        value->report(myString);
-        shape.setTextSize(1);
-        shape.setCursor(0,0);
-        shape.println(myString);
-        matrix->drawBitmap(x,y, shape.getBuffer(), shape.width(), shape.height(), 0x001F, 0xFFFF);
-    }
-
-    
+    shape.setTextSize(1);
+    shape.setCursor(0,0);
+    shape.println(myString);
+    matrix->drawBitmap(x,y, shape.getBuffer(), shape.width(), shape.height(), 0x001F, 0xFFFF);
 }
 
 void controlBlobCallback(Value *value, String data, String timestamp)
@@ -228,6 +208,7 @@ void controlBlobCallback(Value *value, String data, String timestamp)
 
     canvas.setCursor(0,0);
     canvas.println(text);
+    //canvas.printf(text.c_str());
 
     Serial.println(x);
     Serial.println(y);
@@ -239,14 +220,12 @@ void controlBlobCallback(Value *value, String data, String timestamp)
     Serial.println(root.memoryUsage());
 
     matrix->drawBitmap(x,y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex, bgHex);
+
 }
 
 void controlBrightnessCallback(Value *value, String data, String timestamp)
 {
-    int userInput = data.toInt();
-    Serial.println(userInput);
-    int brightness = (userInput / 100.0f) * 255;
-    Serial.println(brightness);
+    int brightness = (data.toInt() / 100.0f) * 255;
     matrix->setBrightness8(brightness);
 }
 
@@ -283,8 +262,8 @@ void setup()
                                     OE_PIN, 
                                     CLK_PIN};
     HUB75_I2S_CFG mxconfig(
-        64,                     // module width
-        64,                     // module height
+        MATRIX_WIDTH,           // module width
+        MATRIX_HEIGHT,          // module height
         1,                      // Chain length
         _pins,                  // pin mapping
         HUB75_I2S_CFG::FM6126A  // driver chip
@@ -313,58 +292,67 @@ void setup()
     // Create device
     myDevice = myNetwork->createDevice(&myDeviceDescription);
     
-    // Create first echo string value
-    myEchoStringValueTA1Header = myDevice->createStringValue(&echoStringValueTA1Header);
-    myEchoStringValueTA1Header->onControl(&controlEchoCallback);
+    // Create first string value
+    textArea1Header = myDevice->createStringValue(&valueTextArea1Header);
+    textArea1Header->onControl(&controlTextAreasCallback);
 
-    // Create second echo string value
-    myEchoStringValueTA2 = myDevice->createStringValue(&echoStringValueTA2);
-    myEchoStringValueTA2->onControl(&controlEchoCallback);
+    // Create second string value
+    textArea2 = myDevice->createStringValue(&valueTextArea2);
+    textArea2->onControl(&controlTextAreasCallback);
 
-    // Create third echo string value
-    myEchoStringValueTA3 = myDevice->createStringValue(&echoStringValueTA3);
-    myEchoStringValueTA3->onControl(&controlEchoCallback);
+    // Create third string value
+    textArea3 = myDevice->createStringValue(&valueTextArea3);
+    textArea3->onControl(&controlTextAreasCallback);
 
-    // Create fourth echo string value
-    myEchoStringValueTA4Footer = myDevice->createStringValue(&echoStringValueTA4Footer);
-    myEchoStringValueTA4Footer->onControl(&controlEchoCallback);
+    // Create fourth string value
+    textArea4Footer = myDevice->createStringValue(&valueTextArea4Footer);
+    textArea4Footer->onControl(&controlTextAreasCallback);
 
-    myEchoStringValueShape = myDevice->createStringValue(&echoStringValueShape);
-    myEchoStringValueShape->onControl(&controlEchoCallback);
+    // Create shape value
+    myEchoStringValueShape = myDevice->createStringValue(&valueShape);
+    myEchoStringValueShape->onControl(&controlShapeCallback);
 
+    // Create a Value for brightness control
     brightnessValue = myDevice->createValueNumber(&intValueBrightness);
     brightnessValue->onControl(&controlBrightnessCallback);
 
+    // Create a Value for genericCanvas
     genericCanvas = myDevice->createBlobValue(&genericCanvasValue);
     genericCanvas->onControl(&controlBlobCallback);
     
     // Get the last echo string values
-    myString = myEchoStringValueTA1Header->getControlData();
+    myString = textArea1Header->getControlData();
     displayText(myString, 0);
-    myEchoStringValueTA1Header->report(myString);
+    textArea1Header->report(myString);
     Serial.println(myString);
 
-    myString = myEchoStringValueTA2->getControlData();
+    myString = textArea2->getControlData();
     displayText(myString, 16); 
-    myEchoStringValueTA2->report(myString);
+    textArea2->report(myString);
     Serial.println(myString);
 
-    myString = myEchoStringValueTA3->getControlData();
+    myString = textArea3->getControlData();
     displayText(myString, 32);
-    myEchoStringValueTA3->report(myString);
+    textArea3->report(myString);
     Serial.println(myString);
 
-    myString = myEchoStringValueTA4Footer->getControlData();
+    myString = textArea4Footer->getControlData();
     displayText(myString, 48);
-    myEchoStringValueTA4Footer->report(myString);
+    textArea4Footer->report(myString);
     Serial.println(myString);
 }
 
 void loop()
 {
-    delay(200);
+    delay(50);
     
     wappsto.dataAvailable();
+
+    /*test.fillScreen(0);
+    test.setCursor(0,0);
+    test.print((millis()));
+
+    matrix->drawBitmap(0, 56, test.getBuffer(), test.width(), test.height(), 0xf800, 0x0000); */
     
     //debug led
     if (e == 0) 
