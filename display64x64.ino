@@ -200,7 +200,6 @@ void controlEchoCallback(Value *value, String data, String timestamp)
 
 void controlBlobCallback(Value *value, String data, String timestamp)
 {
-    //memset(doc->_readBuffer, 0x00, sizeof(doc->_readBuffer));
     StaticJsonDocument<512> root;
     DeserializationError err = deserializeJson(root, data);
     if(err)
@@ -217,12 +216,15 @@ void controlBlobCallback(Value *value, String data, String timestamp)
     int16_t h = root["textCanvasSizeWH"]["height"];
 
     GFXcanvas1 canvas(w, h);
+    canvas.fillScreen(0x0000);
 
     String text = root["textContent"]["string"];
 
-    uint16_t textColor = root["textColor16bit565"]["color"];
-    uint16_t bgColor = root["backgroundColor16bit565"]["color"];
+    String textColor = root["textColor16bit565"]["color"];
+    String bgColor = root["backgroundColor16bit565"]["color"];
 
+    uint16_t textHex = (uint16_t) strtoul(textColor.c_str() + 2, NULL, 16);
+    uint16_t bgHex = (uint16_t) strtoul(bgColor.c_str() + 2, NULL, 16);
 
     canvas.setCursor(0,0);
     canvas.println(text);
@@ -232,13 +234,11 @@ void controlBlobCallback(Value *value, String data, String timestamp)
     Serial.println(w);
     Serial.println(h);
     Serial.println(text);
-    Serial.println(textColor);
-    Serial.println(bgColor);
+    Serial.println(textHex, HEX);
+    Serial.println(bgHex, HEX);
     Serial.println(root.memoryUsage());
 
-    matrix->drawBitmap(x,y, canvas.getBuffer(), canvas.width(), canvas.height(), textColor, 0x0000);
-
-    //int memoryUsage = root.memoryUsage();   
+    matrix->drawBitmap(x,y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex, bgHex);
 }
 
 void controlBrightnessCallback(Value *value, String data, String timestamp)
