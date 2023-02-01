@@ -189,24 +189,27 @@ void controlBlobCallback(Value *value, String data, String timestamp)
         return;
     }
 
-    int16_t x = root["textCanvasPosXY"]["x"];
-    int16_t y = root["textCanvasPosXY"]["y"];
+    int16_t x = root["pos"]["x"];
+    int16_t y = root["pos"]["y"];
 
-    int16_t w = root["textCanvasSizeWH"]["width"];
-    int16_t h = root["textCanvasSizeWH"]["height"];
+    int16_t w = root["size"]["w"];
+    int16_t h = root["size"]["h"];
 
     GFXcanvas1 canvas(w, h);
     canvas.fillScreen(0x0000);
 
-    String text = root["textContent"]["string"];
+    String text = root["txt"]["str"];
 
-    String textColor = root["textColor16bit565"]["color"];
-    String bgColor = root["backgroundColor16bit565"]["color"];
+    int16_t textSize = root["tSize"]["int"];
+
+    String textColor = root["tClr"]["hex"];
+    String bgColor = root["bClr"]["hex"];
 
     uint16_t textHex = (uint16_t) strtoul(textColor.c_str() + 2, NULL, 16);
     uint16_t bgHex = (uint16_t) strtoul(bgColor.c_str() + 2, NULL, 16);
 
     canvas.setCursor(0,0);
+    canvas.setTextSize(textSize);
     canvas.println(text);
     //canvas.printf(text.c_str());
 
@@ -217,6 +220,7 @@ void controlBlobCallback(Value *value, String data, String timestamp)
     Serial.println(text);
     Serial.println(textHex, HEX);
     Serial.println(bgHex, HEX);
+    Serial.println(textSize);
     Serial.println(root.memoryUsage());
 
     matrix->drawBitmap(x,y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex, bgHex);
