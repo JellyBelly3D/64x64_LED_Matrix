@@ -249,7 +249,7 @@ void initializeWifi(void)
 void setup()
 {
     Serial.begin(115200);
-    randomSeed(analogRead(0));
+    //randomSeed(analogRead(0));
 
     HUB75_I2S_CFG::i2s_pins _pins={ R1_PIN, 
                                     G1_PIN, 
@@ -324,7 +324,7 @@ void setup()
     genericCanvas = myDevice->createBlobValue(&genericCanvasValue);
     genericCanvas->onControl(&controlBlobCallback);
     
-    // Get the last echo string values
+    // Get last wappsto session values
     myString = textArea1Header->getControlData();
     displayText(myString, 0);
     textArea1Header->report(myString);
