@@ -29,7 +29,7 @@
 #define MATRIX_WIDTH  64 // Number of pixels tall of each INDIVIDUAL panel module.
 
 const char ssid[] = "seluxit_guest";
-const char password[] = "sunflower4everyone";
+const char password[] = "sunflower4everyone"; // "sunflower4everyone"
 
 MatrixPanel_I2S_DMA *matrix = nullptr;
 WiFiMulti WiFiMulti;
@@ -42,7 +42,7 @@ Value *textArea1Header;
 Value *textArea2;
 Value *textArea3;
 Value *textArea4Footer;
-Value *myEchoStringValueShape;
+Value *monochromeBitMap;
 Value *brightnessValue;
 Value *genericCanvas;
 
@@ -64,10 +64,12 @@ String myString = "";
 //Defining canvases for the screen area.
 //canvas64x16 has room for a maximum of 20 characters in two rows up to 10 characters each. 
 GFXcanvas1 canvas64x16(64,16); 
-GFXcanvas1 shape(32,16);
-GFXcanvas1 test(64,8);
+//GFXcanvas1 shape(32,16);
+//GFXcanvas1 test(64,8);
 
-//GFXcanvas1 blobShape(64, 64);
+const uint8_t wifiIcon8x8[] = {
+    B11111111 /*0xff*/,B00000000 /*0x00*/, B01111110 /*0x7e*/, B00000000 /*0x00*/, B00111100 /*0x3c*/, B00000000 /*0x00*/, 
+    B00011000 /*0x18*/,B00011000 /*0x18*/ };
 
 void displayText(String text, int yPos) {
   int16_t  x1, y1;
@@ -106,13 +108,7 @@ ValueString_t valueTextArea4Footer = {  .name = "Text Area 4: Footer",
                                     .permission = READ_WRITE,
                                     .max = 20,
                                     .encoding = ""};
-
-ValueString_t valueShape = {  .name = "Test Shape",
-                                    .type = "string",
-                                    .permission = READ_WRITE,
-                                    .max = 10,
-                                    .encoding = ""};
-                                    
+    
 ValueNumber_t intValueBrightness =  {  .name = "Brightness",
                                     .type = "int",
                                     .permission = READ_WRITE,
@@ -121,6 +117,12 @@ ValueNumber_t intValueBrightness =  {  .name = "Brightness",
                                     .step = 1,
                                     .unit = "%",
                                     .si_conversion = ""};
+
+ValueBlob_t genericBitmapValue = { .name = "Bitmap",
+                                    .type = "value type",
+                                    .permission = WRITE,
+                                    .max = 1024,
+                                    .encoding = ""};
 
 ValueBlob_t genericCanvasValue = {  .name = "Generic JSON input",
                                     .type = "value type",
@@ -163,19 +165,44 @@ void controlTextAreasCallback(Value *value, String data, String timestamp)
     matrix->drawBitmap(x, y, canvas64x16.getBuffer(), 64, 16, 0xffff, 0x0000); //printing canvas out to the screen
 }
 
-void controlShapeCallback(Value *value, String data, String timestamp)
+void controlBitmapCallback(Value *value, String data, String timestamp)
 {
-    uint16_t x = 32;
-    uint16_t y = 40;
+    static unsigned char monoBitmap[] = {};
 
-    shape.fillScreen(0x0000); // clearing the canvas 
-    myString = data;
-    Serial.println(myString);
-    value->report(myString);
-    shape.setTextSize(1);
-    shape.setCursor(0,0);
-    shape.println(myString);
-    matrix->drawBitmap(x,y, shape.getBuffer(), shape.width(), shape.height(), 0x001F, 0xFFFF);
+    StaticJsonDocument<1024> root;
+    DeserializationError err = deserializeJson(root, data);
+    if(err)
+    {
+        Serial.print("Deserialization failed: ");
+        Serial.println(err.f_str());
+        return;
+    }
+
+    int16_t x = root["pos"]["x"];
+    int16_t y = root["pos"]["y"];
+
+    int16_t w = root["size"]["w"];
+    int16_t h = root["size"]["h"];    
+
+    GFXcanvas1 canvas(w, h);
+    canvas.fillScreen(0x0000);
+    
+    JsonArray stringArray = root["bitMap"];
+
+    uint8_t i = 0;
+    const char* temp;
+
+    for (auto value : stringArray)
+    {
+        temp = value.as<const char*>();
+
+        monoBitmap[i] = strtol(temp, NULL, 16);
+
+        i++;
+    }
+
+    Serial.printf("%s\n", monoBitmap);
+
 }
 
 void controlBlobCallback(Value *value, String data, String timestamp)
@@ -237,11 +264,31 @@ void initializeWifi(void)
 {
     Serial.println("Initializing WiFi");
     WiFiMulti.addAP(ssid, password);
+    matrix->setCursor(0,0);
+    matrix->print("Connecting");
+    matrix->setCursor(0,8);
+    matrix->print(ssid);
+
     while(WiFiMulti.run() != WL_CONNECTED) 
     {
         Serial.print(".");
-        delay(500);
+        if (e % 8 == 0) 
+            {
+                matrix->drawXBitmap(28,28, wifiIcon8x8, 8, 8, 0xe280);
+            } 
+        else
+            {
+                matrix->fillScreen(0);
+            }
+        e++;
+        delay(50);
     }
+
+    matrix->drawXBitmap(28,28, wifiIcon8x8, 8,8, 0x0460);
+    matrix->setCursor(0, 37);
+    matrix->print("Connected");
+    matrix->setCursor(0, 44);
+    matrix->println(WiFi.localIP());
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 }
@@ -249,7 +296,6 @@ void initializeWifi(void)
 void setup()
 {
     Serial.begin(115200);
-    //randomSeed(analogRead(0));
 
     HUB75_I2S_CFG::i2s_pins _pins={ R1_PIN, 
                                     G1_PIN, 
@@ -313,8 +359,8 @@ void setup()
     textArea4Footer->onControl(&controlTextAreasCallback);
 
     // Create shape value
-    myEchoStringValueShape = myDevice->createStringValue(&valueShape);
-    myEchoStringValueShape->onControl(&controlShapeCallback);
+    monochromeBitMap = myDevice->createBlobValue(&genericBitmapValue);
+    monochromeBitMap->onControl(&controlBitmapCallback);
 
     // Create a Value for brightness control
     brightnessValue = myDevice->createValueNumber(&intValueBrightness);
@@ -348,16 +394,7 @@ void setup()
 
 void loop()
 {
-    delay(50);
-    
     wappsto.dataAvailable();
-
-    /*test.fillScreen(0);
-    test.setCursor(0,0);
-    test.print((millis()));
-
-    matrix->drawBitmap(0, 56, test.getBuffer(), test.width(), test.height(), 0xf800, 0x0000); */
-    
     //debug led
     if (e == 0) 
     {
@@ -368,6 +405,5 @@ void loop()
     {
         matrix->drawPixel(63, 63, matrix->color565(0, 0, 0));
         e=0;
-    }
-     
+    }   
 }
