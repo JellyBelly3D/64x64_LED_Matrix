@@ -64,11 +64,9 @@ String myString = "";
 //Defining canvases for the screen area.
 //canvas64x16 has room for a maximum of 20 characters in two rows up to 10 characters each. 
 GFXcanvas1 canvas64x16(64,16); 
-//GFXcanvas1 shape(32,16);
-//GFXcanvas1 test(64,8);
 
 const uint8_t wifiIcon8x8[] = {
-    B11111111 /*0xff*/,B00000000 /*0x00*/, B01111110 /*0x7e*/, B00000000 /*0x00*/, B00111100 /*0x3c*/, B00000000 /*0x00*/, 
+    B11111111 /*ff*/,B00000000 /*0x00*/, B01111110 /*0x7e*/, B00000000 /*0x00*/, B00111100 /*0x3c*/, B00000000 /*0x00*/, 
     B00011000 /*0x18*/,B00011000 /*0x18*/ };
 
 void displayText(String text, int yPos) {
@@ -167,8 +165,6 @@ void controlTextAreasCallback(Value *value, String data, String timestamp)
 
 void controlBitmapCallback(Value *value, String data, String timestamp)
 {
-    static unsigned char monoBitmap[] = {};
-
     StaticJsonDocument<1024> root;
     DeserializationError err = deserializeJson(root, data);
     if(err)
@@ -187,22 +183,31 @@ void controlBitmapCallback(Value *value, String data, String timestamp)
     GFXcanvas1 canvas(w, h);
     canvas.fillScreen(0x0000);
     
-    JsonArray stringArray = root["bitMap"];
+    String bitMapString = root["bitMap"];
 
-    uint8_t i = 0;
-    const char* temp;
+    uint8_t monoBitmap[bitMapString.length()/2];
 
-    for (auto value : stringArray)
+    Serial.println(bitMapString);
+
+    for (int i = 0; i < bitMapString.length(); i+=2)
     {
-        temp = value.as<const char*>();
+        char hexPair[3]; // creating 3 character array, 2 char for hex value 1 for ensuring NULL termination.
+        strncpy(hexPair, bitMapString.c_str() + i, 2); // copying two characters from bitMapString to hexPair.
+        hexPair[2] = '\0'; // adding NULL termination to hexPair array.
 
-        monoBitmap[i] = strtol(temp, NULL, 16);
-
-        i++;
+        monoBitmap[i/2] = (uint8_t) strtoul(hexPair, NULL, 16);
+        Serial.print(i);
+        Serial.print(" ");
+        Serial.println(monoBitmap[i/2], HEX);
     }
+    //canvas.drawXBitmap(0,0, monoBitmap, w,h, 0xffff);
 
-    Serial.printf("%s\n", monoBitmap);
+    matrix->drawXBitmap(x,y, monoBitmap, w, h, 0xffff);
 
+    /*Serial.println(x);
+    Serial.println(y);
+    Serial.println(w);
+    Serial.println(h);*/
 }
 
 void controlBlobCallback(Value *value, String data, String timestamp)
@@ -264,31 +269,38 @@ void initializeWifi(void)
 {
     Serial.println("Initializing WiFi");
     WiFiMulti.addAP(ssid, password);
+
     matrix->setCursor(0,0);
     matrix->print("Connecting");
     matrix->setCursor(0,8);
     matrix->print(ssid);
 
+    uint16_t notConnected = 0;
+
     while(WiFiMulti.run() != WL_CONNECTED) 
     {
-        Serial.print(".");
-        if (e % 8 == 0) 
-            {
-                matrix->drawXBitmap(28,28, wifiIcon8x8, 8, 8, 0xe280);
-            } 
-        else
-            {
-                matrix->fillScreen(0);
-            }
-        e++;
-        delay(50);
+        Serial.println("WiFi not connected");
+
+        matrix->drawXBitmap(28,28, wifiIcon8x8, 8, 8, 0xe280);
+        delay(100);
+        matrix->drawXBitmap(28,28, wifiIcon8x8, 8, 8, 0x0000);
+
+        notConnected++;
+        if(notConnected > 150)
+        {
+            Serial.println("Resetting controller: WiFI not connecting");
+            ESP.restart();
+        }
     }
 
     matrix->drawXBitmap(28,28, wifiIcon8x8, 8,8, 0x0460);
+
     matrix->setCursor(0, 37);
     matrix->print("Connected");
+
     matrix->setCursor(0, 44);
     matrix->println(WiFi.localIP());
+
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 }
