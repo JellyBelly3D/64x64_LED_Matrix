@@ -119,7 +119,7 @@ ValueNumber_t intValueBrightness =  {  .name = "Brightness",
 ValueBlob_t genericBitmapValue = { .name = "Bitmap",
                                     .type = "value type",
                                     .permission = WRITE,
-                                    .max = 1024,
+                                    .max = 2048,
                                     .encoding = ""};
 
 ValueBlob_t genericCanvasValue = {  .name = "Generic JSON input",
@@ -165,7 +165,8 @@ void controlTextAreasCallback(Value *value, String data, String timestamp)
 
 void controlBitmapCallback(Value *value, String data, String timestamp)
 {
-    StaticJsonDocument<1024> root;
+    StaticJsonDocument<1560> root;
+    //DynamicJsonDocument root(2048);
     DeserializationError err = deserializeJson(root, data);
     if(err)
     {
@@ -178,7 +179,11 @@ void controlBitmapCallback(Value *value, String data, String timestamp)
     int16_t y = root["pos"]["y"];
 
     int16_t w = root["size"]["w"];
-    int16_t h = root["size"]["h"];    
+    int16_t h = root["size"]["h"];
+
+    String bColor = root["color"]["hex"];
+
+    uint16_t bitHex = (uint16_t) strtoul(bColor.c_str() + 2, NULL, 16);
 
     GFXcanvas1 canvas(w, h);
     canvas.fillScreen(0x0000);
@@ -186,8 +191,6 @@ void controlBitmapCallback(Value *value, String data, String timestamp)
     String bitMapString = root["bitMap"];
 
     uint8_t monoBitmap[bitMapString.length()/2];
-
-    Serial.println(bitMapString);
 
     for (int i = 0; i < bitMapString.length(); i+=2)
     {
@@ -202,12 +205,7 @@ void controlBitmapCallback(Value *value, String data, String timestamp)
     }
     //canvas.drawXBitmap(0,0, monoBitmap, w,h, 0xffff);
 
-    matrix->drawXBitmap(x,y, monoBitmap, w, h, 0xffff);
-
-    /*Serial.println(x);
-    Serial.println(y);
-    Serial.println(w);
-    Serial.println(h);*/
+    matrix->drawXBitmap(x,y, monoBitmap, w, h, bitHex);
 }
 
 void controlBlobCallback(Value *value, String data, String timestamp)
@@ -282,7 +280,7 @@ void initializeWifi(void)
         Serial.println("WiFi not connected");
 
         matrix->drawXBitmap(28,28, wifiIcon8x8, 8, 8, 0xe280);
-        delay(100);
+        delay(500);
         matrix->drawXBitmap(28,28, wifiIcon8x8, 8, 8, 0x0000);
 
         notConnected++;
@@ -338,7 +336,7 @@ void setup()
     initializeWifi();
     initializeNtp();
 
-    wappsto.config(network_uuid, ca, client_crt, client_key, 5, NO_LOGS);
+    wappsto.config(network_uuid, ca, client_crt, client_key, 5, VERBOSE);
     if(wappsto.connect()) 
     {
         Serial.println("Connected to Wappsto");
@@ -415,7 +413,8 @@ void loop()
     } 
     else 
     {
-        matrix->drawPixel(63, 63, matrix->color565(0, 0, 0));
+        matrix->drawPixel(63, 63, matrix->color565(255, 0, 0));
         e=0;
+        //matrix->drawPixel(63,63, matrix->color565(0,0,255));
     }   
 }
