@@ -165,8 +165,8 @@ void controlTextAreasCallback(Value *value, String data, String timestamp)
 
 void controlBitmapCallback(Value *value, String data, String timestamp)
 {
-    StaticJsonDocument<1560> root;
-    //DynamicJsonDocument root(2048);
+    //StaticJsonDocument<2048> root;
+    DynamicJsonDocument root(2048);
     DeserializationError err = deserializeJson(root, data);
     if(err)
     {
@@ -181,31 +181,32 @@ void controlBitmapCallback(Value *value, String data, String timestamp)
     int16_t w = root["size"]["w"];
     int16_t h = root["size"]["h"];
 
-    String bColor = root["color"]["hex"];
+    String bColor = root["clr"]["hex"];
 
-    uint16_t bitHex = (uint16_t) strtoul(bColor.c_str() + 2, NULL, 16);
+    uint16_t bitColorHex = (uint16_t) strtoul(bColor.c_str() + 2, NULL, 16);
 
     GFXcanvas1 canvas(w, h);
     canvas.fillScreen(0x0000);
     
     String bitMapString = root["bitMap"];
 
-    uint8_t monoBitmap[bitMapString.length()/2];
+    uint8_t monoBitmap[bitMapString.length()/2]; /* setting the size of "monoBitmap" to half of bitMapString 
+                                                    since 2 chars = 1 hex value */
 
     for (int i = 0; i < bitMapString.length(); i+=2)
     {
-        char hexPair[3]; // creating 3 character array, 2 char for hex value 1 for ensuring NULL termination.
+        char hexPair[3]; // 3 character array, 2 char for hex value 1 for NULL termination.
         strncpy(hexPair, bitMapString.c_str() + i, 2); // copying two characters from bitMapString to hexPair.
         hexPair[2] = '\0'; // adding NULL termination to hexPair array.
 
         monoBitmap[i/2] = (uint8_t) strtoul(hexPair, NULL, 16);
-        Serial.print(i);
+        /*Serial.print(i);
         Serial.print(" ");
-        Serial.println(monoBitmap[i/2], HEX);
+        Serial.println(monoBitmap[i/2], HEX); */
     }
-    //canvas.drawXBitmap(0,0, monoBitmap, w,h, 0xffff);
-
-    matrix->drawXBitmap(x,y, monoBitmap, w, h, bitHex);
+    
+    canvas.drawXBitmap(0,0, monoBitmap, w,h, bitColorHex); // drawing "monoBitmap" to a canvas
+    matrix->drawBitmap(x,y, canvas.getBuffer(), w, h, bitColorHex); // drawing canvas on a screen
 }
 
 void controlBlobCallback(Value *value, String data, String timestamp)
@@ -286,7 +287,7 @@ void initializeWifi(void)
         notConnected++;
         if(notConnected > 150)
         {
-            Serial.println("Resetting controller: WiFI not connecting");
+            Serial.println("Resetting the controller: WiFI not connecting");
             ESP.restart();
         }
     }
@@ -336,7 +337,7 @@ void setup()
     initializeWifi();
     initializeNtp();
 
-    wappsto.config(network_uuid, ca, client_crt, client_key, 5, VERBOSE);
+    wappsto.config(network_uuid, ca, client_crt, client_key, 5, NO_LOGS);
     if(wappsto.connect()) 
     {
         Serial.println("Connected to Wappsto");
