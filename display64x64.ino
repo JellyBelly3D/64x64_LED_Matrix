@@ -66,7 +66,7 @@ const uint8_t wifiIcon8x8[] = {
 
 uint8_t monoBitmap[512]; // size of the array will change based on size of the image
 
-uint16_t cat[] = {0x4c5b, 0x0b5b, 0xea62, 0x0b6b, 0x2b6b, 0x4c73, 0x2c6b, 0x4d6b,
+/*uint16_t cat[] = {0x4c5b, 0x0b5b, 0xea62, 0x0b6b, 0x2b6b, 0x4c73, 0x2c6b, 0x4d6b,
 0x4c6b, 0xef7b, 0x6d6b, 0x2c6b, 0x4d6b, 0x2d6b, 0x4d6b, 0x4c6b,
 0x6c73, 0x6c6b, 0x6d6b, 0x6d6b, 0x6e6b, 0x8e73, 0x6d6b, 0x8d73,
 0x6d6b, 0xae73, 0x6e6b, 0x8f6b, 0xcf6b, 0xaf6b, 0xae73, 0xae6b,
@@ -578,6 +578,7 @@ uint16_t cat[] = {0x4c5b, 0x0b5b, 0xea62, 0x0b6b, 0x2b6b, 0x4c73, 0x2c6b, 0x4d6b
 0x47a3, 0x47a3, 0x0abc, 0xaccc, 0xeddc, 0x4ee5, 0x4ee5, 0x2ddd,
 0x2ddd, 0x2ddd, 0x0ed5, 0xaebc, 0x2da4, 0xed8b, 0x0f8c, 0xef83,
 0x3084, 0x107c, 0x107c, 0x107c, 0x107c, 0x107c, 0x1084, 0x718c,};
+*/
 
 void convertToBigEndian(uint16_t* input, int length) {
   for (int i = 0; i < length; i++) {
@@ -604,7 +605,8 @@ void displayText(String text, int yPos)
                                     .type = "string",
                                     .permission = READ_WRITE,
                                     .max = 20,
-                                    .encoding = ""};*/
+                                    .encoding = ""};
+*/
 
 ValueNumber_t intValueBrightness = {.name = "Brightness",
                                     .type = "int",
@@ -633,6 +635,9 @@ ValueBlob_t genericCanvasValue = {.name = "Generic JSON input",
                                   .max = 512,
                                   .encoding = ""};
 
+static  uint8_t bitmap[8192];
+
+
 void controlRgbBitmapCallback(Value *value, String data, String timestamp)
 {
   DynamicJsonDocument root(1024);
@@ -657,7 +662,6 @@ void controlRgbBitmapCallback(Value *value, String data, String timestamp)
 
   int httpCode = http.GET();
 
-  uint8_t payload[4096];
   // httpCode will be negative on error
   if (httpCode > 0)
   {
@@ -666,8 +670,42 @@ void controlRgbBitmapCallback(Value *value, String data, String timestamp)
     // file found at server
     if (httpCode == HTTP_CODE_OK)
     {
-      http.getStream().read(payload, 4096);
-      //Serial.println((char*)payload);
+      uint8_t buffer[128] = {0}; //buffer for read
+
+      WiFiClient* stream = http.getStreamPtr(); //pointer to tcp stream
+
+      int contentLength = http.getSize(); //length of 'Content-Length' HTTP header
+      Serial.println(contentLength);
+      int index = 0;
+      
+      while(http.connected() && (contentLength > 0 && contentLength <= 8192 || contentLength == -1))
+      {
+        size_t size = stream->available();
+        if(size)
+        {
+          int c = stream->readBytes(buffer, ((size > sizeof(buffer)) ? sizeof(buffer) : size));
+
+          memcpy(bitmap +index, buffer, c);
+          
+        
+          index+=c;
+
+          if(contentLength > 0) 
+          {
+            contentLength -= c;
+          }
+          Serial.print("contentLength: ");
+          Serial.print(contentLength);
+          Serial.print(" size: ");
+          Serial.print(size);
+          Serial.print(" c: ");
+          Serial.print(c);
+          Serial.print(" index: ");
+          Serial.println(index);
+        }
+      }
+      //Serial.println((int)bitmap);
+      
     }
   }
   else
@@ -681,8 +719,18 @@ void controlRgbBitmapCallback(Value *value, String data, String timestamp)
 
   //uint16_t bitmap[payload.length()] = strtoul(payload.c_str(), NULL, 16);
 
-  GFXcanvas1 canvas(w, h);
-  canvas.fillScreen(0x0000);
+  uint16_t* cat = (uint16_t*) bitmap;
+
+  //convertToBigEndian(cat, w * h);
+  
+  GFXcanvas16 catCanvas(64,64);
+
+  memset(monoBitmap, 0xff, 512);
+  matrix->clearScreen();
+
+  catCanvas.drawRGBBitmap(0, 0, cat, monoBitmap, 64, 64);
+
+  matrix->drawRGBBitmap(0,0, catCanvas.getBuffer(), 64, 64);
 
   /*canvas.drawRGBBitmap(0,0, rgbBitmap, w,h); // drawing "rgbBitmap" to a canvas
   matrix->drawRGBBitmap(x,y, canvas.getBuffer(), w, h); // drawing canvas on a screen */
@@ -893,16 +941,6 @@ void setup()
   genericCanvas = myDevice->createBlobValue(&genericCanvasValue);
   genericCanvas->onControl(&controlBlobCallback);
 
-  convertToBigEndian(cat, sizeof(cat) / sizeof(cat[0]));
-  
-  GFXcanvas16 catCanvas(64,64);
-
-  memset(monoBitmap, 0xff, 512);
-  matrix->clearScreen();
-
-  catCanvas.drawRGBBitmap(0, 0, cat, monoBitmap, 64, 64);
-
-  matrix->drawRGBBitmap(0,0, catCanvas.getBuffer(), 64, 64);
 }
 
 void loop()
