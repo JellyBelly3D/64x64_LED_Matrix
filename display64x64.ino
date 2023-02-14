@@ -42,16 +42,16 @@ HTTPClient http;
 
 Network *myNetwork;
 Device *myDevice;
-Value *rgbBitmap;
-Value *monochromeBitMap;
-Value *brightnessValue;
-Value *genericCanvas;
+Value *colorBitmap;
+Value *monoBitmap;
+Value *brightness;
+Value *text;
 
 DeviceDescription_t myDeviceDescription = {
     .name = "Display",
-    .product = "ESP32 64x64 RBG LED Matrix",
+    .product = "ESP32 64x64 RGB LED Matrix",
     .manufacturer = "",
-    .description = "This is a ESP32 64x64 display, it can output a maximum of 80 signs",
+    .description = "",
     .version = "1.0",
     .serial = "00001",
     .protocol = "Json-RPC",
@@ -64,8 +64,8 @@ const uint8_t wifiIcon8x8[] = {
     B11111111 /*ff*/, B00000000 /*0x00*/, B01111110 /*0x7e*/, B00000000 /*0x00*/, B00111100 /*0x3c*/, B00000000 /*0x00*/,
     B00011000 /*0x18*/, B00011000 /*0x18*/};
 
-uint8_t monoBitmap[512]; // the maximum possible size needed for a monochrome 64x64 bitmap
-static  uint8_t bitmap[8192]; // the maximum possible size needed for a RGB565 64x64 bitmap
+static uint8_t maskBuffer[512]; // the maximum possible size needed for a monochrome w*h bitmap
+static uint8_t colorBitmapBuffer[8192]; // the maximum possible size needed for a RGB565 w*h bitmap
 
 void convertToBigEndian(uint16_t* input, int length) {
   for (int i = 0; i < length; i++) {
@@ -88,7 +88,7 @@ void displayText(String text, int yPos)
   matrix->print(text);
 }
 
-ValueNumber_t intValueBrightness = {.name = "Brightness",
+ValueNumber_t brightnessValue = {.name = "Brightness",
                                     .type = "int",
                                     .permission = READ_WRITE,
                                     .min = 0,
@@ -97,25 +97,25 @@ ValueNumber_t intValueBrightness = {.name = "Brightness",
                                     .unit = "%",
                                     .si_conversion = ""};
 
-ValueBlob_t genericBitmapValue = {.name = "Bitmap",
+ValueBlob_t monoBitmapValue = {.name = "Mono Bitmap",
                                   .type = "value type",
                                   .permission = WRITE,
                                   .max = 2048,
                                   .encoding = ""};
 
-ValueBlob_t genericRgbBitmapValue = {.name = "RGB565 Bitmap",
+ValueBlob_t colorBitmapValue = {.name = "RGB565 Bitmap",
                                      .type = "value type",
-                                     .permission = WRITE,
+                                     .permission = READ_WRITE,
                                      .max = 4092,
                                      .encoding = ""};
 
-ValueBlob_t genericCanvasValue = {.name = "Generic JSON input",
+ValueBlob_t textValue = {.name = "Text input",
                                   .type = "value type",
                                   .permission = WRITE,
                                   .max = 512,
                                   .encoding = ""};
 
-void controlRgbBitmapCallback(Value *value, String data, String timestamp)
+void controlColorBitmapCallback(Value *value, String data, String timestamp)
 {
   DynamicJsonDocument root(1024);
   DeserializationError err = deserializeJson(root, data);
@@ -136,72 +136,63 @@ void controlRgbBitmapCallback(Value *value, String data, String timestamp)
   Serial.println(url);
 
   http.begin(url);
-
   int httpCode = http.GET();
-
-  // httpCode will be negative on error
-  if (httpCode > 0)
+  if(httpCode != HTTP_CODE_OK)
   {
-    // HTTP header has been send and Server response header has been handled
-    Serial.printf("[HTTP] GET code: %d\n", httpCode);
-    // file found at server
-    if (httpCode == HTTP_CODE_OK)
+    colorBitmap->report(httpCode);
+    return;
+  }
+
+  int contentLength = http.getSize(); //length of 'Content-Length' HTTP header
+  if(contentLength > (MATRIX_HEIGHT * MATRIX_WIDTH * 2))
+  {
+    colorBitmap->report("Image size bigger than Matrix W*H*2");
+    return;
+  }
+
+  uint8_t buffer[128] = {0}; //buffer for reading 'n' bytes at the time
+  WiFiClient* dataStream = http.getStreamPtr(); //pointer to tcp stream
+
+  if(contentLength == w * h * 2) /*proceed if contentLength does not exceed matrix dimensions 
+                                                                                           AND fulfills dimensions specified in JSON config */
+  {
+    int index = 0; //start address for the colorBitmapBuffer array, with every loop it shifts address pointer
+    while(http.connected() && (contentLength > 0 || contentLength == -1))
     {
-      uint8_t buffer[128] = {0}; //buffer for reading 'n' bytes at the time
-
-      WiFiClient* dataStream = http.getStreamPtr(); //pointer to tcp stream
-
-      int contentLength = http.getSize(); //length of 'Content-Length' HTTP header
-      Serial.println(contentLength);
-      int index = 0; //start address for the array, with every loop it shifts address pointer
-      
-      while(http.connected() && (contentLength > 0 && contentLength <= 8192 || contentLength == -1))
+      size_t size = dataStream->available();
+      if(size)
       {
-        size_t size = dataStream->available();
-        if(size)
+        int data = dataStream->readBytes(buffer, ((size > sizeof(buffer)) ? sizeof(buffer) : size));
+
+        memcpy(colorBitmapBuffer +index, buffer, data);//copying buffer in to bitmap array and adjusting for position in which new data should be written
+
+        index+=data; //shifting the start position in array by the size of 'data'
+
+        if(contentLength > 0) 
         {
-          int data = dataStream->readBytes(buffer, ((size > sizeof(buffer)) ? sizeof(buffer) : size));
-
-          memcpy(bitmap +index, buffer, data);//copying buffer in to bitmap array and adjusting for position in which new data should be written
-          
-          index+=data; //shifting the start position in array by the size of 'data'
-
-          if(contentLength > 0) 
-          {
-            contentLength -= data; //updating the content length with the amoutn of bits written
-          }
-          Serial.print("contentLength: ");
-          Serial.print(contentLength);
-          Serial.print(" size: ");
-          Serial.print(size);
-          Serial.print(" data: ");
-          Serial.print(data);
-          Serial.print(" index: ");
-          Serial.println(index);
+          contentLength -= data; //updating the content length with the amoutn of bits written
         }
       }
     }
+    //helper function for all of this stuff is desperately needed
+    uint16_t* rgbBitmap = (uint16_t*) colorBitmapBuffer; /*casting the array type from 1byte array to 2byte, 
+                                                             since drawRGBBitmap takes 2byte bitmap*/
+    GFXcanvas16 canvas(w,h);
+    canvas.fillScreen(0x0000); //clearing canvas area 
+
+    memset(maskBuffer, 0xff, (MATRIX_HEIGHT * MATRIX_WIDTH) / 8); //filling out the maskBuffer with white color
+    canvas.drawRGBBitmap(0,0, rgbBitmap, maskBuffer, w,h); //filling the canvas out with rgbBitmap and maskBuffer
+    matrix->drawRGBBitmap(x,y, canvas.getBuffer(), canvas.width(),canvas.height()); //outputting canvas to a screen
+    http.end();
+    colorBitmap->report("Success");
   }
   else
   {
-    Serial.printf("[HTTP] GET failed, error: %s\n", http.errorToString(httpCode).c_str());
+    colorBitmap->report("Image size does not meet WxHx2");
   }
-
-  http.end();
-
-  uint16_t* rgbBitmap = (uint16_t*) bitmap; /*casting the array type from 1byte array to 2byte, 
-                                              since drawRGBBitmap takes 2byte bitmap*/
-  
-  GFXcanvas16 canvas(w,h);
-  canvas.fillScreen(0x0000); //clearing canvas area 
-
-  memset(monoBitmap, 0xff, 512); //filling out the mask with white color
-  
-  canvas.drawRGBBitmap(0,0, rgbBitmap, monoBitmap, w,h); //filling the canvas out with rgbBitmap and mask
-  matrix->drawRGBBitmap(x,y, canvas.getBuffer(), canvas.width(),canvas.height()); //outputting canvas to a screen
 }
 
-void controlBitmapCallback(Value *value, String data, String timestamp)
+void controlMonoBitmapCallback(Value *value, String data, String timestamp)
 {
   // StaticJsonDocument<2048> root;
   DynamicJsonDocument root(2048);
@@ -247,7 +238,7 @@ void controlBitmapCallback(Value *value, String data, String timestamp)
   matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), bitColorHex); // drawing canvas on a screen
 }
 
-void controlBlobCallback(Value *value, String data, String timestamp)
+void controlTextCallback(Value *value, String data, String timestamp)
 {
   StaticJsonDocument<512> root;
   DeserializationError err = deserializeJson(root, data);
@@ -296,9 +287,10 @@ void controlBlobCallback(Value *value, String data, String timestamp)
 
 void controlBrightnessCallback(Value *value, String data, String timestamp)
 {
-  int brightness = (data.toInt() / 100.0f) * 255;
-  matrix->setBrightness8(brightness);
-  Serial.println(brightness);
+  int strength = (data.toInt() / 100.0f) * 255;
+  matrix->setBrightness8(strength);
+  int receivedValue = data.toInt();
+  brightness->report(receivedValue);
 }
 
 void initializeWifi(void)
@@ -391,20 +383,20 @@ void setup()
   myDevice = myNetwork->createDevice(&myDeviceDescription);
 
   // Create Bitmap value
-  monochromeBitMap = myDevice->createBlobValue(&genericBitmapValue);
-  monochromeBitMap->onControl(&controlBitmapCallback);
+  monoBitmap = myDevice->createBlobValue(&monoBitmapValue);
+  monoBitmap->onControl(&controlMonoBitmapCallback);
 
   // Create RGB565 Bitmap value
-  rgbBitmap = myDevice->createBlobValue(&genericRgbBitmapValue);
-  rgbBitmap->onControl(&controlRgbBitmapCallback);
+  colorBitmap = myDevice->createBlobValue(&colorBitmapValue);
+  colorBitmap->onControl(&controlColorBitmapCallback);
 
   // Create a Value for brightness control
-  brightnessValue = myDevice->createValueNumber(&intValueBrightness);
-  brightnessValue->onControl(&controlBrightnessCallback);
+  brightness = myDevice->createValueNumber(&brightnessValue);
+  brightness->onControl(&controlBrightnessCallback);
 
   // Create a Value for genericCanvas
-  genericCanvas = myDevice->createBlobValue(&genericCanvasValue);
-  genericCanvas->onControl(&controlBlobCallback);
+  text = myDevice->createBlobValue(&textValue);
+  text->onControl(&controlTextCallback);
 
   Serial.printf("Setup complete");
 }
