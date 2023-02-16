@@ -109,6 +109,20 @@ void drawCanvasText(int16_t x, int16_t y, int16_t w, int16_t h, String text, int
   matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex, bgHex);
 }
 
+bool keyValidate(Value *value, DynamicJsonDocument *root, const char *keys[], uint8_t keyAmount)
+{
+  for(int i = 0; i < keyAmount; i++)
+  {
+    char* key = (char*)keys[i];
+    if(!root->containsKey(key))
+    {
+      value->report("JSON missing " + (String)key);
+      return false;
+    }
+  }
+  return true;
+}
+
 void errorMessageReport(Value *value, String error)
 {
   Serial.println(error);
@@ -148,11 +162,18 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  int16_t x = root["pos"]["x"];
-  int16_t y = root["pos"]["y"];
+  const char* keys[5] = {"x", "y", "w", "h", "url"};
 
-  int16_t w = root["size"]["w"];
-  int16_t h = root["size"]["h"];
+  if(!(keyValidate(value, &root, keys, 5)))
+  {
+    return;
+  }
+
+  int16_t x = root["x"];
+  int16_t y = root["y"];
+
+  int16_t w = root["w"];
+  int16_t h = root["h"];
 
   String url = root["url"];
   Serial.println(url);
@@ -171,7 +192,8 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
   {
     http.end();
     errorMessageReport(value, 
-                      "Image exeeds matrix dimensions " 
+                      "Image size of " + String(contentLength)
+                       + " bytes exeeds max posible size for matrix dimensions " 
                        + String(MATRIX_WIDTH) + " * " 
                        + String(MATRIX_HEIGHT) + " * " 
                        + "2 bytes.");
@@ -213,20 +235,6 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
   value->report("Success");
 }
 
-bool keyValidate(Value *value, DynamicJsonDocument *root, const char *keys[], uint8_t keyAmount)
-{
-  for(int i = 0; i < keyAmount; i++)
-  {
-    char* key = (char*)keys[i];
-    if(!root->containsKey(key))
-    {
-      value->report("JSON missing " + (String)key);
-      return false;
-    }
-  }
-  return true;
-}
-
 void controlMonoBitmapCallback(Value *value, String data, String timestamp)
 {
   // StaticJsonDocument<2048> root;
@@ -251,25 +259,26 @@ void controlMonoBitmapCallback(Value *value, String data, String timestamp)
   int16_t w = root["w"];
   int16_t h = root["h"];
 
-  String bColor = root["color"];
+  String color = root["color"];
 
-  uint16_t bitColorHex = (uint16_t)strtoul(bColor.c_str() + 2, NULL, 16); //converting string input to hex
+  uint16_t bitColorHex = (uint16_t)strtoul(color.c_str() + 2, NULL, 16); //converting string input to hex
 
   String bitMapString = root["bitmap"];
 
   if(bitMapString.length() > (MATRIX_HEIGHT*MATRIX_WIDTH)/4)
   {
-    errorMessageReport(value, "Bitmap size exeeds matrix dimensions " 
+    errorMessageReport(value, "Bitmap size of " + String(bitMapString.length()) 
+                       + " bytes exeeds max posible size for matrix dimensions " 
                        + String(MATRIX_WIDTH) + " * " 
                        + String(MATRIX_HEIGHT) + " / " 
-                       + "4 byte size.");
+                       + "4 bytes.");
     return;
   }
 
   if(bitMapString.length() != (w*h)/4)
   {
-     errorMessageReport(value, "Bitmap " + String(bitMapString.length()) 
-                       + " does not meet " 
+     errorMessageReport(value, "Bitmap size of " + String(bitMapString.length()) 
+                       + " bytes does not meet " 
                        + String(w) + " * " 
                        + String(h) + " / " 
                        + "4 byte size specification.");
@@ -286,9 +295,6 @@ void controlMonoBitmapCallback(Value *value, String data, String timestamp)
     hexPair[2] = '\0';                             // adding NULL termination to hexPair array.
 
     monoBitmap[i / 2] = (uint8_t)strtoul(hexPair, NULL, 16);
-    /*Serial.print(i);
-    Serial.print(" ");
-    Serial.println(monoBitmap[i/2], HEX); */
   }
   drawCanvas1(x,y,w,h,monoBitmap,bitColorHex);
   value->report("Success");
@@ -296,7 +302,7 @@ void controlMonoBitmapCallback(Value *value, String data, String timestamp)
 
 void controlTextCallback(Value *value, String data, String timestamp)
 {
-  StaticJsonDocument<512> root;
+  DynamicJsonDocument root(512);
   DeserializationError err = deserializeJson(root, data);
   if (err)
   {
@@ -304,18 +310,25 @@ void controlTextCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  int16_t x = root["pos"]["x"];
-  int16_t y = root["pos"]["y"];
+  const char* keys[7] = {"x", "y", "w", "h", "text", "tColor", "bColor"};
 
-  int16_t w = root["size"]["w"];
-  int16_t h = root["size"]["h"];
+  if(!(keyValidate(value, &root, keys, 7)))
+  {
+    return;
+  }
 
-  String text = root["txt"]["str"];
+  int16_t x = root["x"];
+  int16_t y = root["y"];
 
-  int16_t textSize = root["tSize"]["int"];
+  int16_t w = root["w"];
+  int16_t h = root["h"];
 
-  String textColor = root["tClr"]["hex"];
-  String bgColor = root["bClr"]["hex"];
+  String text = root["text"];
+
+  int16_t textSize = root["tSize"]; // by default is 1
+
+  String textColor = root["tColor"];
+  String bgColor = root["bColor"];
 
   uint16_t textHex = (uint16_t)strtoul(textColor.c_str() + 2, NULL, 16);
   uint16_t bgHex = (uint16_t)strtoul(bgColor.c_str() + 2, NULL, 16);
