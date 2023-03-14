@@ -162,7 +162,7 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  const char *keys[5] = {"x", "y", "w", "h", "url"};
+  const char *keys[5] = {"x", "y", "w", "h", "bitmap"};
 
   if (!(keyValidate(value, &root, keys, 5)))
   {
@@ -483,6 +483,5 @@ void loop()
   {
     matrix->drawPixel(63, 63, matrix->color565(255, 0, 0));
     e = 0;
-    // matrix->drawPixel(63,63, matrix->color565(0,0,255));
   }
 }
