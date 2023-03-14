@@ -19,7 +19,7 @@ WiFiMulti WiFiMulti;
 WiFiClientSecure client;
 Wappsto wappsto(&client);
 
-HTTPClient http;
+HTTPClient https;
 
 Network *myNetwork;
 Device *myDevice;
@@ -45,47 +45,47 @@ const uint8_t wifiIcon8x8[] = {
     B11111111 /*ff*/, B00000000 /*0x00*/, B01111110 /*0x7e*/, B00000000 /*0x00*/, B00111100 /*0x3c*/, B00000000 /*0x00*/,
     B00011000 /*0x18*/, B00011000 /*0x18*/};
 
-static uint8_t maskBuffer[(MATRIX_HEIGHT * MATRIX_WIDTH)/8]; // the maximum possible size needed for a monochrome (w*h)/8 bitmap
+static uint8_t maskBuffer[(MATRIX_HEIGHT * MATRIX_WIDTH) / 8];      // the maximum possible size needed for a monochrome (w*h)/8 bitmap
 static uint8_t colorBitmapBuffer[MATRIX_HEIGHT * MATRIX_WIDTH * 2]; // the maximum possible size needed for a RGB565 w*h*2 bitmap
 
 ValueNumber_t brightnessValue = {.name = "Brightness",
-                                    .type = "int",
-                                    .permission = READ_WRITE,
-                                    .min = 0,
-                                    .max = 100,
-                                    .step = 1,
-                                    .unit = "%",
-                                    .si_conversion = ""};
+                                 .type = "int",
+                                 .permission = READ_WRITE,
+                                 .min = 0,
+                                 .max = 100,
+                                 .step = 1,
+                                 .unit = "%",
+                                 .si_conversion = ""};
 
 ValueBlob_t monoBitmapValue = {.name = "Mono Bitmap",
-                                  .type = "value type",
-                                  .permission = READ_WRITE,
-                                  .max = 2048,
-                                  .encoding = ""};
+                               .type = "value type",
+                               .permission = READ_WRITE,
+                               .max = 2048,
+                               .encoding = ""};
 
 ValueBlob_t colorBitmapValue = {.name = "RGB565 Bitmap",
-                                     .type = "value type",
-                                     .permission = READ_WRITE,
-                                     .max = 4092,
-                                     .encoding = ""};
+                                .type = "value type",
+                                .permission = READ_WRITE,
+                                .max = 4092,
+                                .encoding = ""};
 
 ValueBlob_t textValue = {.name = "Text input",
-                                  .type = "value type",
-                                  .permission = READ_WRITE,
-                                  .max = 512,
-                                  .encoding = ""};
+                         .type = "value type",
+                         .permission = READ_WRITE,
+                         .max = 512,
+                         .encoding = ""};
 
 void drawCanvas16(int16_t x, int16_t y, int16_t w, int16_t h)
 {
-  uint16_t* bitmap16 = (uint16_t*) colorBitmapBuffer; /*casting the array type from 8bit array to 16bit, 
+  uint16_t *bitmap16 = (uint16_t *)colorBitmapBuffer; /*casting the array type from 8bit array to 16bit,
                                                         since drawRGBBitmap takes 16bit bitmap*/
   GFXcanvas16 canvas(w, h);
-  canvas.fillScreen(0x0000); //clearing canvas area 
+  canvas.fillScreen(0x0000); // clearing canvas area
 
-  memset(maskBuffer, 0xff, (MATRIX_HEIGHT * MATRIX_WIDTH) / 8); //filling out maskBuffer with white color
+  memset(maskBuffer, 0xff, (MATRIX_HEIGHT * MATRIX_WIDTH) / 8); // filling out maskBuffer with white color
 
-  canvas.drawRGBBitmap(0,0, bitmap16, maskBuffer, w, h); //filling the canvas out with rgbBitmap and maskBuffer
-  matrix->drawRGBBitmap(x, y, canvas.getBuffer(), canvas.width(),canvas.height()); //outputting canvas to a screen
+  canvas.drawRGBBitmap(0, 0, bitmap16, maskBuffer, w, h);                           // filling the canvas out with rgbBitmap and maskBuffer
+  matrix->drawRGBBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height()); // outputting canvas to a screen
 }
 
 void drawCanvas1(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t *monoBitmap, uint16_t bitColorHex)
@@ -93,7 +93,7 @@ void drawCanvas1(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t *monoBitmap
   GFXcanvas1 canvas(w, h);
   canvas.fillScreen(0x0000);
 
-  canvas.drawXBitmap(0, 0, monoBitmap, w, h, bitColorHex); // drawing "monoBitmap" to a canvas
+  canvas.drawXBitmap(0, 0, monoBitmap, w, h, bitColorHex);                                    // drawing "monoBitmap" to a canvas
   matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), bitColorHex); // drawing canvas on a screen
 }
 
@@ -111,10 +111,10 @@ void drawCanvasText(int16_t x, int16_t y, int16_t w, int16_t h, String text, int
 
 bool keyValidate(Value *value, DynamicJsonDocument *root, const char *keys[], uint8_t keyAmount)
 {
-  for(int i = 0; i < keyAmount; i++)
+  for (int i = 0; i < keyAmount; i++)
   {
-    char* key = (char*)keys[i];
-    if(!root->containsKey(key))
+    char *key = (char *)keys[i];
+    if (!root->containsKey(key))
     {
       value->report("JSON missing " + (String)key);
       return false;
@@ -128,10 +128,10 @@ void errorMessageReport(Value *value, String error)
   Serial.println(error);
   value->report(error);
 }
-//may not be needed anymore since data received from http comes in big endian
-void convertToBigEndian(uint16_t* input, int length)
+// may not be needed anymore since data received from https comes in big endian
+void convertToBigEndian(uint16_t *input, int length)
 {
-  for (int i = 0; i < length; i++) 
+  for (int i = 0; i < length; i++)
   {
     input[i] = (input[i] << 8) | (input[i] >> 8);
   }
@@ -162,9 +162,9 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  const char* keys[5] = {"x", "y", "w", "h", "url"};
+  const char *keys[5] = {"x", "y", "w", "h", "url"};
 
-  if(!(keyValidate(value, &root, keys, 5)))
+  if (!(keyValidate(value, &root, keys, 5)))
   {
     return;
   }
@@ -175,24 +175,34 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
   int16_t w = root["w"];
   int16_t h = root["h"];
 
-  String url = root["url"];
+  String url = root["bitmap"];
   Serial.println(url);
 
-  http.begin(url);
-  int httpCode = http.GET(); //HTTPClient can output negative error codes, check "HTTPClient.h"
-  if(httpCode != HTTP_CODE_OK)
+  WiFiClientSecure *insecure = new WiFiClientSecure;
+  if (!insecure)
   {
-    http.end();
+    https.end();
+    errorMessageReport(value, "Could not create new WiFi client");
+    return;
+  }
+
+  insecure->setInsecure();
+
+  https.begin(*insecure, url);
+  int httpCode = https.GET(); // HTTPClient can output negative error codes, check "HTTPClient.h"
+  if (httpCode != HTTP_CODE_OK)
+  {
+    https.end();
     errorMessageReport(value, (String)httpCode);
     return;
   }
-  
-  int contentLength = http.getSize(); //length of 'Content-Length' HTTP header
-  if(contentLength > (MATRIX_HEIGHT * MATRIX_WIDTH * 2)) //return if contentLength is bigger than max matrix dimensions*2 in size
+
+  int contentLength = https.getSize();                    // length of 'Content-Length' HTTP header
+  if (contentLength > (MATRIX_HEIGHT * MATRIX_WIDTH * 2)) // return if contentLength is bigger than max matrix dimensions*2 in size
   {
-    http.end();
-    errorMessageReport(value, 
-                      "Image size of " + String(contentLength)
+    https.end();
+    errorMessageReport(value,
+                       "Image size of " + String(contentLength)
                        + " bytes exeeds max posible size for matrix dimensions " 
                        + String(MATRIX_WIDTH) + " * " 
                        + String(MATRIX_HEIGHT) + " * " 
@@ -200,38 +210,42 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  if(contentLength != w * h * 2) //return if contentLength does not match width*heigth*2 bytes
+  if (contentLength != w * h * 2) // return if contentLength does not match width*heigth*2 bytes
   {
-    http.end();
-    errorMessageReport(value, 
-                      "Image does not meet "
-                       + String(w) + " * " 
-                       + String(h) + " * " 
-                       + "2 byte size specification.");
+    https.end();
+    errorMessageReport(value,
+                       "Image does not meet "
+                        + String(w) + " * "
+                        + String(h) + " * " 
+                        + "2 byte size specification.");
+
     return;
   }
 
-  uint8_t buffer[128] = {0}; //buffer for reading 'n' bytes at the time
-  WiFiClient* dataStream = http.getStreamPtr(); //pointer to tcp stream
-  int index = 0; //start address for the colorBitmapBuffer array, with every loop it shifts address pointer
+  uint8_t buffer[128] = {0};                     // buffer for reading 'n' bytes at the time
+  WiFiClient *dataStream = https.getStreamPtr(); // pointer to tcp stream
+  int index = 0;                                 // start address for the colorBitmapBuffer array, with every loop it shifts address pointer
 
-  while(http.connected() && (contentLength > 0 || contentLength == -1)) //continue for as long as there is a http connection and content
+  while (https.connected() && (contentLength > 0 || contentLength == -1)) // continue for as long as there is a http connection and content
   {
     size_t size = dataStream->available();
-    if(size)
+    if (size)
     {
       int data = dataStream->readBytes(buffer, ((size > sizeof(buffer)) ? sizeof(buffer) : size));
-      memcpy(colorBitmapBuffer +index, buffer, data);//copying buffer in to bitmap array and adjusting for position in which new data should be written
-      index += data; //shifting the start position in array by the size of 'data'
+      memcpy(colorBitmapBuffer + index, buffer, data); // copying buffer in to bitmap array and adjusting for position in which new data should be written
+      index += data;                                   // shifting the start position in array by the size of 'data'
 
-      if(contentLength > 0) 
+      if (contentLength > 0)
       {
-        contentLength -= data; //updating the content length with the amoutn of bits written
+        contentLength -= data; // updating the content length with the amoutn of bits written
       }
     }
   }
-  http.end();
-  drawCanvas16(x,y,w,h);
+
+  https.end();
+  delete insecure;
+
+  drawCanvas16(x, y, w, h);
   value->report("Success");
 }
 
@@ -246,9 +260,9 @@ void controlMonoBitmapCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  const char* keys[6] = {"x", "y", "w", "h", "color", "bitmap"};
+  const char *keys[6] = {"x", "y", "w", "h", "color", "bitmap"};
 
-  if(!(keyValidate(value, &root, keys, 6)))
+  if (!(keyValidate(value, &root, keys, 6)))
   {
     return;
   }
@@ -261,23 +275,23 @@ void controlMonoBitmapCallback(Value *value, String data, String timestamp)
 
   String color = root["color"];
 
-  uint16_t bitColorHex = (uint16_t)strtoul(color.c_str() + 2, NULL, 16); //converting string input to hex
+  uint16_t bitColorHex = (uint16_t)strtoul(color.c_str() + 2, NULL, 16); // converting string input to hex
 
   String bitMapString = root["bitmap"];
 
-  if(bitMapString.length() > (MATRIX_HEIGHT*MATRIX_WIDTH)/4)
+  if (bitMapString.length() > (MATRIX_HEIGHT * MATRIX_WIDTH) / 4)
   {
     errorMessageReport(value, "Bitmap size of " + String(bitMapString.length()) 
                        + " bytes exeeds max posible size for matrix dimensions " 
-                       + String(MATRIX_WIDTH) + " * " 
+                       + String(MATRIX_WIDTH) + " * "
                        + String(MATRIX_HEIGHT) + " / " 
                        + "4 bytes.");
     return;
   }
 
-  if(bitMapString.length() != (w*h)/4)
+  if (bitMapString.length() != (w * h) / 4)
   {
-     errorMessageReport(value, "Bitmap size of " + String(bitMapString.length()) 
+    errorMessageReport(value, "Bitmap size of " + String(bitMapString.length()) 
                        + " bytes does not meet " 
                        + String(w) + " * " 
                        + String(h) + " / " 
@@ -296,7 +310,7 @@ void controlMonoBitmapCallback(Value *value, String data, String timestamp)
 
     monoBitmap[i / 2] = (uint8_t)strtoul(hexPair, NULL, 16);
   }
-  drawCanvas1(x,y,w,h,monoBitmap,bitColorHex);
+  drawCanvas1(x, y, w, h, monoBitmap, bitColorHex);
   value->report("Success");
 }
 
@@ -310,9 +324,9 @@ void controlTextCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  const char* keys[7] = {"x", "y", "w", "h", "text", "tColor", "bColor"};
+  const char *keys[7] = {"x", "y", "w", "h", "text", "tColor", "bColor"};
 
-  if(!(keyValidate(value, &root, keys, 7)))
+  if (!(keyValidate(value, &root, keys, 7)))
   {
     return;
   }
@@ -333,7 +347,7 @@ void controlTextCallback(Value *value, String data, String timestamp)
   uint16_t textHex = (uint16_t)strtoul(textColor.c_str() + 2, NULL, 16);
   uint16_t bgHex = (uint16_t)strtoul(bgColor.c_str() + 2, NULL, 16);
 
-  drawCanvasText(x,y,w,h,text,textSize,textHex,bgHex);
+  drawCanvasText(x, y, w, h, text, textSize, textHex, bgHex);
   value->report("Success");
 }
 
@@ -414,7 +428,7 @@ void setup()
   mxconfig.clkphase = false;
   matrix = new MatrixPanel_I2S_DMA(mxconfig);
   matrix->begin();
-  //matrix->setBrightness8(255);
+  // matrix->setBrightness8(255);
   initializeWifi();
   initializeNtp();
 
