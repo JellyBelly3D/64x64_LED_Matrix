@@ -193,6 +193,7 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
   if (httpCode != HTTP_CODE_OK)
   {
     https.end();
+    delete insecure;
     errorMessageReport(value, (String)httpCode);
     return;
   }
@@ -201,6 +202,7 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
   if (contentLength > (MATRIX_HEIGHT * MATRIX_WIDTH * 2)) // return if contentLength is bigger than max matrix dimensions*2 in size
   {
     https.end();
+    delete insecure;
     errorMessageReport(value,
                        "Image size of " + String(contentLength)
                        + " bytes exeeds max posible size for matrix dimensions " 
@@ -213,6 +215,7 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
   if (contentLength != w * h * 2) // return if contentLength does not match width*heigth*2 bytes
   {
     https.end();
+    delete insecure;
     errorMessageReport(value,
                        "Image does not meet "
                         + String(w) + " * "
