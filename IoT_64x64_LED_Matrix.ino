@@ -1,5 +1,5 @@
-#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h> // tested using v2.0.7
-#include <FastLED.h>                         // tested using v3.4.0
+#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h> // tested using v2.0.7 versions 3.0.5 to 3.0.8 unstable
+#include <FastLED.h>                         // tested using v3.5.0
 
 #include <WiFiMulti.h>
 #include <WiFiClientSecure.h>
@@ -12,7 +12,7 @@
 #include "display_defines.h"
 
 const char ssid[] = "seluxit_guest";
-const char password[] = "sunflower4everyone"; // "sunflower4everyone"
+const char password[] = "sunflower4everyone";
 
 MatrixPanel_I2S_DMA *matrix = nullptr;
 WiFiMulti WiFiMulti;
@@ -97,16 +97,21 @@ void drawCanvas1(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t *monoBitmap
   matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), bitColorHex); // drawing canvas on a screen
 }
 
-void drawCanvasText(int16_t x, int16_t y, int16_t w, int16_t h, String text, int16_t textSize, uint16_t textHex, uint16_t bgHex)
+void drawCanvasText(int16_t x, int16_t y, int16_t w, int16_t h, String text, int16_t textSize, uint16_t textHex, uint16_t bgHex, bool drawBG)
 {
   GFXcanvas1 canvas(w, h);
-  canvas.fillScreen(0x0000);
-
   canvas.setCursor(0, 0);
   canvas.setTextSize(textSize);
   canvas.println(text);
 
-  matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex, bgHex);
+  if(drawBG)
+  {
+    matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex, bgHex);
+  }
+  else
+  {    
+    matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex);
+  }
 }
 
 bool keyValidate(Value *value, DynamicJsonDocument *root, const char *keys[], uint8_t keyAmount)
@@ -127,29 +132,6 @@ void errorMessageReport(Value *value, String error)
 {
   Serial.println(error);
   value->report(error);
-}
-// may not be needed anymore since data received from https comes in big endian
-void convertToBigEndian(uint16_t *input, int length)
-{
-  for (int i = 0; i < length; i++)
-  {
-    input[i] = (input[i] << 8) | (input[i] >> 8);
-  }
-}
-
-void displayText(String text, int yPos)
-{
-  int16_t x1, y1;
-  uint16_t w, h;
-  // matrix.setFont(&FreeSans9pt7b);
-
-  matrix->setTextSize(1);
-  char charBuf[text.length() + 1];
-  text.toCharArray(charBuf, text.length() + 1);
-  matrix->getTextBounds(charBuf, 0, yPos, &x1, &y1, &w, &h);
-  // int startingX = 33 - (w / 2);
-  matrix->setCursor(0, yPos);
-  matrix->print(text);
 }
 
 void controlColorBitmapCallback(Value *value, String data, String timestamp)
@@ -254,7 +236,6 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
 
 void controlMonoBitmapCallback(Value *value, String data, String timestamp)
 {
-  // StaticJsonDocument<2048> root;
   DynamicJsonDocument root(2048);
   DeserializationError err = deserializeJson(root, data);
   if (err)
@@ -327,9 +308,9 @@ void controlTextCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  const char *keys[7] = {"x", "y", "w", "h", "text", "tColor", "bColor"};
+  const char *keys[8] = {"x", "y", "w", "h", "text", "tColor", "bColor", "drawBG"}; 
 
-  if (!(keyValidate(value, &root, keys, 7)))
+  if (!(keyValidate(value, &root, keys, 8)))
   {
     return;
   }
@@ -342,15 +323,17 @@ void controlTextCallback(Value *value, String data, String timestamp)
 
   String text = root["text"];
 
-  int16_t textSize = root["tSize"]; // by default is 1
+  int16_t textSize = root["tSize"];
 
   String textColor = root["tColor"];
   String bgColor = root["bColor"];
 
+  bool drawBG = root["drawBG"].as<bool>();
+
   uint16_t textHex = (uint16_t)strtoul(textColor.c_str() + 2, NULL, 16);
   uint16_t bgHex = (uint16_t)strtoul(bgColor.c_str() + 2, NULL, 16);
 
-  drawCanvasText(x, y, w, h, text, textSize, textHex, bgHex);
+  drawCanvasText(x, y, w, h, text, textSize, textHex, bgHex, drawBG);
   value->report("Success");
 }
 
@@ -431,7 +414,6 @@ void setup()
   mxconfig.clkphase = false;
   matrix = new MatrixPanel_I2S_DMA(mxconfig);
   matrix->begin();
-  // matrix->setBrightness8(255);
   initializeWifi();
   initializeNtp();
 
@@ -463,12 +445,13 @@ void setup()
   brightness = myDevice->createValueNumber(&brightnessValue);
   brightness->onControl(&controlBrightnessCallback);
 
-  String lastBrightness = brightness->getControlData();
-  matrix->setBrightness8((uint8_t)lastBrightness.toInt());
-
   // Create a Value for genericCanvas
   text = myDevice->createBlobValue(&textValue);
   text->onControl(&controlTextCallback);
+
+  // Set latest brightness value from WappsTo
+  String lastBrightness = brightness->getControlData();
+  matrix->setBrightness8((uint8_t)lastBrightness.toInt());
 
   Serial.println("Setup complete");
 }
