@@ -39,6 +39,11 @@ DeviceDescription_t myDeviceDescription = {
     .communication = "WiFi",
 };
 
+int lastBitmapXpos = 0;
+int lastBitmapYpos = 0;
+int lastBitmapW = 0;
+int lastBitmapH = 0;
+
 unsigned int e = 0;
 
 const uint8_t wifiIcon8x8[] = {
@@ -82,10 +87,15 @@ void drawCanvas16(int16_t x, int16_t y, int16_t w, int16_t h)
   GFXcanvas16 canvas(w, h);
   canvas.fillScreen(0x0000); // clearing canvas area
 
-  memset(maskBuffer, 0xff, (MATRIX_HEIGHT * MATRIX_WIDTH) / 8); // filling out maskBuffer with white color
+  memset(maskBuffer, 0xff, (w * h) / 8); // filling out maskBuffer with white color
 
   canvas.drawRGBBitmap(0, 0, bitmap16, maskBuffer, w, h);                           // filling the canvas out with rgbBitmap and maskBuffer
   matrix->drawRGBBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height()); // outputting canvas to a screen
+
+  lastBitmapXpos = x;
+  lastBitmapYpos = y;
+  lastBitmapH = h;
+  lastBitmapW = w;
 }
 
 void drawCanvas1(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t *monoBitmap, uint16_t bitColorHex)
@@ -109,7 +119,8 @@ void drawCanvasText(int16_t x, int16_t y, int16_t w, int16_t h, String text, int
     matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex, bgHex);
   }
   else
-  {    
+  {
+    drawCanvas16(lastBitmapXpos,lastBitmapYpos,lastBitmapW,lastBitmapH);
     matrix->drawBitmap(x, y, canvas.getBuffer(), canvas.width(), canvas.height(), textHex);
   }
 }
