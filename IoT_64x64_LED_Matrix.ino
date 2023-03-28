@@ -63,19 +63,19 @@ ValueNumber_t brightnessValue = {.name = "Brightness",
                                  .si_conversion = ""};
 
 ValueBlob_t monoBitmapValue = {.name = "Mono Bitmap",
-                               .type = "value type",
+                               .type = "HEX",
                                .permission = READ_WRITE,
                                .max = 2048,
                                .encoding = ""};
 
 ValueBlob_t colorBitmapValue = {.name = "RGB565 Bitmap",
-                                .type = "value type",
+                                .type = "URL",
                                 .permission = READ_WRITE,
                                 .max = 4092,
                                 .encoding = ""};
 
 ValueBlob_t textValue = {.name = "Text input",
-                         .type = "value type",
+                         .type = "String",
                          .permission = READ_WRITE,
                          .max = 512,
                          .encoding = ""};
@@ -205,16 +205,11 @@ void controlColorBitmapCallback(Value *value, String data, String timestamp)
     return;
   }
 
-  if (contentLength != w * h * 2) // return if contentLength does not match width*heigth*2 bytes
+  if (contentLength % 2 != 0) // return if contentLength does not match an odd number of bytes
   {
     https.end();
     delete insecure;
-    errorMessageReport(value,
-                       "Image does not meet "
-                        + String(w) + " * "
-                        + String(h) + " * " 
-                        + "2 byte size specification.");
-
+    errorMessageReport(value, "Corrupt Image" + String(contentLength) + "%2 != 0");
     return;
   }
 
@@ -460,9 +455,19 @@ void setup()
   text = myDevice->createBlobValue(&textValue);
   text->onControl(&controlTextCallback);
 
-  // Set latest brightness value from WappsTo
+  // Set last brightness value from Wappsto
   String lastBrightness = brightness->getControlData();
   matrix->setBrightness8((uint8_t)lastBrightness.toInt());
+
+  // Set last bitmap value from Wappsto
+  String lastColorBitmap = colorBitmap->getControlData();
+  String lastBitmapTimestamp = colorBitmap->getControlTimestamp();
+  controlColorBitmapCallback(colorBitmap,lastColorBitmap,lastBitmapTimestamp); 
+
+  // Set last text value from Wappsto
+  String lastText = text->getControlData();
+  String lastTextTimestamp = text->getControlTimestamp();
+  controlTextCallback(text,lastText,lastTextTimestamp);
 
   Serial.println("Setup complete");
 }
