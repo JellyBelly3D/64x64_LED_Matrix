@@ -37,7 +37,7 @@ Text input - accepts following
   "tColor": "0xffff",
   "bColor": "0x0000",
   "tSize": 1,
-  "text": "",
+  "text": "Hello World",
   "drawBG": true
 }`
 
